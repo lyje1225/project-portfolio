@@ -10,26 +10,63 @@
 | 개발인원  | 개인 프로젝트                                                         |
 | 담당역할  | 6개 프로그램 설계 및 구현 - DB Table / CDS View / RAP Behavior / Fiori Elements 화면 |
 
-### 담당 기능
+### 자재관리 (Material Master)
 
-* 자재관리(Material Master) 프로그램 개발 - 자재유형별 기준정보 및 다국어 자재명 관리
-* 공급업체관리(Vendor Master) 프로그램 개발 - 벤더분류·매입채무 조정계정 관리
-* 구매정보레코드관리(Purchasing Info Record) 프로그램 개발 - 공급업체별 구매조건 사전관리
-* 구매오더관리(Purchase Order) 프로그램 개발 - PIR 연계 발주 생성 및 삭제 상태 관리
-* FI 계정관리(Account Master) 프로그램 개발 - 계정유형별 G/L 계정 마스터 관리
-* 회계계정결정관리(Account Determination) 프로그램 개발 - 이동유형·거래키 기준 계정결정 규칙 관리
-* 전 프로그램 공통 다국어(EN ↔ KO) 처리 적용
+<img src="images/rap/01_material.png" width="800">
 
-### 주요 구현 내용
+* 자재유형별 기준정보 및 다국어 자재명 관리
+* FS에 없던 LVORM(사용중지) 필드를 신규 추가해, 체크 시 다른 입력 필드 전체를 Read-only로 잠그도록 구현
 
-* 6개 프로그램 전체에 동일한 설계 원칙을 통일성 있게 적용 (CDS 기반 Draft/비Draft 시나리오 구현)
-* Text 테이블(SPRAS) + $session.system_language 기반 자재명·계정명 다국어 자동 조회
-* 삭제 지시자(Lvorm/Loevm/Loekz) 체크 시 나머지 입력 가능 필드를 모두 Read-only 처리
-* LINK를 활용해 상위 엔티티의 삭제·비활성 상태를 하위 엔티티까지 실시간 전파 (Feature Control)
-* Number Range·Early Numbering을 활용한 자동 채번 (자재·공급업체·PIR·계정·구매오더)
-* Side Effects로 저장 없이 즉시 필드 상태를 재평가하는 사용자 경험 구현
+### 공급업체관리 (Vendor Master)
+
+<img src="images/rap/02_vendor.png" width="800">
+
+* 벤더분류·매입채무 조정계정 관리
+* 조정계정(Akont) 선택 시 계정유형(Glact)을 Association으로 함께 조회
+* 공급업체 분류(A1~A6)마다 시작 번호대를 다르게 하는 Number Range 채번 로직 구현
+* 삭제플래그(Xloev) 체크 시 별도 액션 없이 값 저장만으로 다른 필드가 즉시 잠기도록 처리 (자재관리와 다른 방식)
+
+### 구매정보레코드관리 (Purchasing Info Record)
+
+<img src="images/rap/05_pir.png" width="800">
+
+* 공급업체별 구매조건(단가·통화·주문단위) 사전관리
+* 정보텍스트(Txz01) 필드를 신규 추가해 Object Page 부제목으로 활용
+* 자재관리(LVORM) 상태를 실시간으로 연계 체크해, 이미 사용중지된 자재를 참조하는 정보레코드는 수정 자체를 차단 (크로스 모듈 연계)
+
+### 구매오더관리 (Purchase Order)
+
+<img src="images/rap/06_po.png" width="800">
+
+* PIR 연계 발주 생성 및 삭제 상태 관리
+* 생성일(Bedat)을 시스템 날짜로 자동 설정
+* 헤더→아이템 삭제 상태를 Side Effects·LINK로 실시간 전파해, 저장 없이도 관련 필드를 즉시 잠금 처리
+
+> **트러블슈팅 - 품목번호(Ebelp) 자동 채번**
+>
+> <img src="images/rap/07_po_troubleshoot.png" width="800">
+>
+> 처음엔 저장할 때 번호를 채워 넣으면 될 거라고 생각했지만, RAP에서는 이미 만들어진 데이터의 키 값을 나중에 수정하는 것 자체가 불가능하다는 것을 알게 됐습니다. 품목번호(Ebelp)가 테이블의 키 값이라 저장 시점에 값을 바꾸는 방식이 허용되지 않았던 것입니다. 결국 Early Numbering + Create by Association 방식으로 바꿔서, 활성/Draft 테이블의 최댓값을 함께 조회해 세션이 달라도 번호가 겹치지 않도록 다시 설계했습니다.
+
+### FI 계정관리 (Account Master)
+
+<img src="images/rap/03_account.png" width="800">
+
+* 계정유형별 G/L 계정 마스터 관리
+* FS에 없던 XLOEV(사용중지) 필드를 신규 추가
+
+### 회계계정결정관리 (Account Determination)
+
+<img src="images/rap/04_accountdet.png" width="800">
+
+* 이동유형·거래키 기준 계정결정 규칙 관리
+* 이동유형(Bwart)별로 순번(Seqnr)이 자동으로 이어지도록(최댓값+1) 채번 로직 구현
+
+### 공통 적용 사항
+
+* CDS 기반 Draft(V4 OData) / 비Draft(V2 OData) 시나리오 6개 프로그램 전체 동일 적용
+* Text 테이블(SPRAS) + `$session.system_language` 기반 자재명·계정명 다국어(EN↔KO) 자동 조회, Validation 에러 메시지도 SE63 번역으로 동일하게 표시
 * Fiori Elements Value Help(F4 CDS) 연계로 플랜트·저장위치·자재유형 등 입력 편의성 확보
-* PIR → PO 등 프로그램 간 참조 연계 로직 및 필수값·참조무결성 검증 로직 구현
 
 ---
 
@@ -43,25 +80,45 @@
 | 개발인원  | 팀 프로젝트                                                        |
 | 담당역할  | MM 모듈 ABAP 개발, SD 영역 Fiori/UI5 화면 개발                          |
 
-### 담당 기능
+### 포장재 자동발주 프로그램 (ZRB4MM0011)
 
-* 포장재 자동발주 프로그램 개발
-* 구매오더 프로그램 개발
-* 통합 결재 프로그램 개발
-* 자재 유통기한 조회 및 폐기 프로그램 개발
-* 입고 프로그램 개발
-* 배송 관리 프로그램 개발
-* 모바일 배송기사 앱 개발
-* 고객 주문 프로그램 개발
+<img src="images/sagye/01_packaging.png" width="800">
 
-### 주요 구현 내용
+* 포장재 재고가 안전재고 이하로 떨어지면 조회 즉시 대상을 강조 표시하고, 확인 후 PR/PO를 자동 생성
+* 단건 발주(Order)와 전체 일괄 발주(Order All) 두 가지 처리 방식 제공
 
-* 구매오더 생성 및 후속 입고 프로세스 연계
-* 구매오더, 생산오더, 재고이전오더 유형별 입고 처리
-* 배치번호, 입고 이력, 재고 상태, 오더 상태 반영
-* CDS View 생성 및 데이터 조회 연계
-* Gateway/OData 기반 Fiori/UI5 화면 연동
-* 배송 상태 조회, 품목별 인계, 전체 배송 완료 처리 화면 구현
+### 통합결재 프로그램 (ZRB4MM0012)
+
+<img src="images/sagye/02_approval.png" width="800">
+
+* MM/SD/PP에서 생성된 결재 문서를 통합 조회하고 승인/반려 처리
+* 결재번호 채번과 참조문서 조회는 Function Module로 분리 개발하고, 승인/반려 처리 로직은 프로그램 내에서 직접 구현
+* 참조문서번호 클릭 시 문서 유형(PO/PR/STO/SO/PD)에 따라 상세 팝업으로 바로 이동
+
+### 구매오더 프로그램 (ZB4MM0011)
+
+<img src="images/sagye/03_po.png" width="800">
+
+* 결재 완료된 구매요청 건에 한해 구매오더 생성, 재고이전오더(STO)도 같은 화면에서 처리
+* 트리 구조로 원자재/재고이전/포장재 이력을 분리해 조회·생성·수정·취소 처리
+
+### 입고 프로그램 (ZB4MM0012)
+
+<img src="images/sagye/04_gr.png" width="800">
+
+* 구매오더(PO)/재고이전오더(STO)/생산오더(PD)의 미입고 건을 트리 구조로 조회하고 입고 확정
+* 배치번호 부여, 부분입고 처리, 오류 건 검증 로직 구현
+
+> **구현 노트 - 오류 건 검증 로직**
+>
+> <img src="images/sagye/05_gr_troubleshoot.png" width="800">
+>
+> 입고수량은 잔여수량 범위 안에서만 입력되도록 시뮬레이션으로 먼저 검증하고, 검증을 통과한 행은 셀 자체를 비활성화해 확정 전 임의 변경을 막았습니다. 오류가 난 행은 몇 번째 행에서 어떤 사유(수량 초과/미입력)로 걸렸는지를 팝업으로 바로 안내해서, 입고 담당자가 무엇을 고쳐야 하는지 헤매지 않도록 만들었습니다.
+
+### 그 외 담당 기능
+
+* 자재 유통기한 조회 프로그램 (ZRB4MM0013) - 유통기한 경과 자재 자동 조회 및 폐기 처리
+* 배송관리 / 사계유통 주문 / 모바일 배송기사 앱 (Fiori/UI5) - 배송 현황 관리, 고객 주문 등록, 배송기사용 모바일 화면
 
 ---
 
